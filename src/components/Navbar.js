@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import RealtimeStatus from './RealtimeStatus';
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
@@ -17,6 +18,7 @@ const Navbar = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <h1 className="text-2xl font-bold text-gray-900">FinMate Admin</h1>
+          <RealtimeStatus />
         </div>
 
         <div className="flex items-center space-x-4">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import AnalyticsCard from '../components/AnalyticsCard';
 import TransactionTable from '../components/TransactionTable';
@@ -32,32 +32,25 @@ const Overview = () => {
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [incomeVsExpense, setIncomeVsExpense] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('all');
 
-  useEffect(() => {
-    fetchAnalytics();
+  // Fetch all users for the dropdown
+  const fetchUsers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, name, email')
+        .order('name');
 
-    // Subscribe to real-time changes for analytics
-    const transactionChannel = supabase
-      .channel('analytics-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'transactions'
-        },
-        () => {
-          fetchAnalytics();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(transactionChannel);
-    };
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
   }, []);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -66,10 +59,16 @@ const Overview = () => {
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
-      // Fetch total transactions
-      const { count: transactionCount, data: allTransactions } = await supabase
+      // Build query for transactions with optional user filter
+      let transactionQuery = supabase
         .from('transactions')
         .select('*', { count: 'exact' });
+
+      if (selectedUserId !== 'all') {
+        transactionQuery = transactionQuery.eq('user_id', selectedUserId);
+      }
+
+      const { count: transactionCount, data: allTransactions } = await transactionQuery;
 
       // Calculate total income and expenses
       const totalIncome = allTransactions
@@ -155,15 +154,59 @@ const Overview = () => {
     } finally {
       setLoading(false);
     }
+  }, [selectedUserId]);
+
+  // Fetch users on mount
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Fetch analytics when user selection changes
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  // Use polling to fetch data every 5 seconds - DISABLED (manual refresh only)
+  // usePolling(fetchAnalytics, 5000);
+
+  const handleManualRefresh = () => {
+    fetchAnalytics();
   };
 
   const COLORS = ['#0ea5e9', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899', '#14b8a6'];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
-        <p className="text-gray-600">Monitor your finance management platform</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
+          <p className="text-gray-600">Monitor your finance management platform</p>
+        </div>
+
+        {/* User Filter and Refresh Button */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleManualRefresh}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition"
+          >
+            <span className={loading ? 'animate-spin' : ''}>🔄</span>
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+          <label className="text-sm font-medium text-gray-700">Filter by User:</label>
+          <select
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white min-w-[200px]"
+          >
+            <option value="all">All Users ({users.length})</option>
+            {users.map(user => (
+              <option key={user.user_id} value={user.user_id}>
+                {user.name || user.email}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Analytics Cards */}
@@ -175,27 +218,27 @@ const Overview = () => {
           loading={loading}
         />
         <AnalyticsCard
-          title="Total Transactions"
+          title={selectedUserId === 'all' ? 'Total Transactions' : 'User Transactions'}
           value={analytics.totalTransactions.toLocaleString()}
           icon="💳"
           loading={loading}
         />
         <AnalyticsCard
-          title="Total Income"
-          value={`$${analytics.totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          icon="�"
+          title={selectedUserId === 'all' ? 'Total Income' : 'User Income'}
+          value={`$${analytics.totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          icon="💰"
           loading={loading}
         />
         <AnalyticsCard
-          title="Total Expenses"
-          value={`$${analytics.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          title={selectedUserId === 'all' ? 'Total Expenses' : 'User Expenses'}
+          value={`$${analytics.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           icon="💸"
           loading={loading}
         />
         <AnalyticsCard
           title="Total Budget"
-          value={`$${analytics.totalBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          icon="�"
+          value={`$${analytics.totalBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          icon="💵"
           loading={loading}
         />
         <AnalyticsCard

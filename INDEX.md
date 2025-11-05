@@ -98,6 +98,28 @@ This will guide you through the entire setup in the right order.
 - Admin columns creation
 - RLS policies for admin access
 - Performance indexes
+
+### 9. **QUICKFIX_REALTIME.md** - Real-time Quick Fix ⚡
+**Purpose**: Fix real-time updates not working  
+**Read this if**: Dashboard works but no live data updates  
+**Time**: 2 minutes  
+**Contents**:
+- Enable Supabase replication (the actual fix)
+- Test real-time updates
+- Troubleshooting checklist
+- Console testing script
+
+### 10. **ENABLE_REALTIME.md** - Complete Real-time Guide
+**Purpose**: Deep dive into real-time functionality  
+**Read this if**: You want to understand real-time in detail  
+**Time**: 15 minutes  
+**Contents**:
+- How to enable replication step-by-step
+- Testing methods
+- Troubleshooting guide
+- Performance optimization
+- Add real-time to more components
+- WebSocket debugging
 - Helper views
 - Triggers and functions
 
